@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - LootSaku</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root {
+            --bg-dark: #0f0c29; --bg-card: #24243e;
+            --primary: #00e6ff; --text: #ffffff;
+            --success: #4caf50; --danger: #f44336;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Montserrat', sans-serif; }
+        body { background: var(--bg-dark); color: var(--text); padding: 20px; }
+        
+        /* LOGIN SYSTEM */
+        #login-section { display: flex; justify-content: center; align-items: center; height: 90vh; }
+        .login-box { background: var(--bg-card); padding: 40px; border-radius: 15px; width: 100%; max-width: 400px; border: 1px solid var(--primary); text-align: center; }
+        .login-box input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px; border: none; outline: none; }
+        .login-box button { width: 100%; padding: 12px; background: var(--primary); color: #000; font-weight: bold; border: none; border-radius: 8px; cursor: pointer; margin-top: 10px; }
+        
+        /* DASHBOARD SYSTEM */
+        #dashboard-section { display: none; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .btn-logout { background: var(--danger); color: #fff; padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
+        
+        table { width: 100%; border-collapse: collapse; background: var(--bg-card); border-radius: 10px; overflow: hidden; }
+        th, td { padding: 15px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 13px; }
+        th { background: rgba(0, 230, 255, 0.1); color: var(--primary); }
+        tr:hover { background: rgba(255,255,255,0.02); }
+        
+        .img-preview { width: 50px; height: 50px; object-fit: cover; border-radius: 5px; cursor: pointer; border: 1px solid var(--primary); margin-right: 5px; }
+        .btn-action { padding: 8px 12px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 12px; margin-right: 5px; color: #fff; }
+        .btn-win { background: var(--success); }
+        .btn-lose { background: var(--danger); }
+        .btn-action:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .status-badge { padding: 5px 10px; border-radius: 15px; font-size: 11px; font-weight: bold; }
+        .s-pending { background: #ff9800; color: #fff; }
+        .s-beruntung { background: var(--success); color: #fff; }
+        .s-gagal { background: var(--danger); color: #fff; }
+    </style>
+</head>
+<body>
+
+    <div id="login-section">
+        <div class="login-box">
+            <h2 style="color: var(--primary); margin-bottom: 20px;">ADMIN LOGIN</h2>
+            <input type="email" id="email" placeholder="Email Admin">
+            <input type="password" id="password" placeholder="Password Admin">
+            <button id="btnLogin">Masuk</button>
+            <p id="loginError" style="color: var(--danger); font-size: 12px; margin-top: 10px; display: none;">Email atau Password salah!</p>
+        </div>
+    </div>
+
+    <div id="dashboard-section">
+        <div class="header">
+            <h2>LootSaku <span style="color: var(--primary);">Admin Panel</span></h2>
+            <button class="btn-logout" id="btnLogout"><i class="fas fa-sign-out-alt"></i> Logout</button>
+        </div>
+        
+        <p style="margin-bottom: 15px; font-size: 14px;">Diurutkan dari peserta tercepat yang mengirim formulir.</p>
+        
+        <div style="overflow-x: auto;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>No</th>
+                        <th>Waktu Klaim</th>
+                        <th>Game & Info Akun</th>
+                        <th>No WhatsApp</th>
+                        <th>Bukti (Sub / Like)</th>
+                        <th>Status</th>
+                        <th>Aksi</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody">
+                    <tr><td colspan="7" style="text-align: center;">Memuat data...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+        import { getFirestore, collection, getDocs, doc, updateDoc, query, orderBy } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+        import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+
+const firebaseConfig = {
+    apiKey: "AIzaSyANafX-Iavt8G15ap4dwD2PppCF7skI1Cg",
+    authDomain: "lootsakuevent.firebaseapp.com",
+    projectId: "lootsakuevent",
+    storageBucket: "lootsakuevent.firebasestorage.app",
+    messagingSenderId: "551944692741",
+    appId: "1:551944692741:web:a5a44ff3a51805830ce86c",
+    measurementId: "G-Y1TCEV1ETJ"
+  };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        // Elements
+        const loginSec = document.getElementById('login-section');
+        const dashSec = document.getElementById('dashboard-section');
+        const tableBody = document.getElementById('tableBody');
+
+        // Cek Status Login
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                loginSec.style.display = 'none';
+                dashSec.style.display = 'block';
+                loadData();
+            } else {
+                loginSec.style.display = 'flex';
+                dashSec.style.display = 'none';
+            }
+        });
+
+        // Proses Login
+        document.getElementById('btnLogin').onclick = async () => {
+            const email = document.getElementById('email').value;
+            const pass = document.getElementById('password').value;
+            try {
+                await signInWithEmailAndPassword(auth, email, pass);
+            } catch (error) {
+                document.getElementById('loginError').style.display = 'block';
+            }
+        };
+
+        // Proses Logout
+        document.getElementById('btnLogout').onclick = () => signOut(auth);
+
+        // Ambil Data dari Firestore
+        async function loadData() {
+            try {
+                // Urutkan berdasarkan waktu klaim (asc = yang pertama daftar ada di atas)
+                const q = query(collection(db, "lootsaku_giveaway"), orderBy("tanggalKlaim", "asc"));
+                const snapshot = await getDocs(q);
+                
+                tableBody.innerHTML = '';
+                
+                if(snapshot.empty) {
+                    tableBody.innerHTML = '<tr><td colspan="7" style="text-align: center;">Belum ada pendaftar.</td></tr>';
+                    return;
+                }
+
+                let no = 1;
+                snapshot.forEach((docSnap) => {
+                    const data = docSnap.data();
+                    const id = docSnap.id;
+                    
+                    // Format Waktu
+                    let waktu = "Tidak diketahui";
+                    if(data.tanggalKlaim) {
+                        const date = data.tanggalKlaim.toDate();
+                        waktu = `${date.getDate()}/${date.getMonth()+1}/${date.getFullYear()} ${date.getHours()}:${date.getMinutes()}`;
+                    }
+
+                    // Format Badge Status
+                    let badgeClass = "s-pending";
+                    if(data.status === "BERUNTUNG") badgeClass = "s-beruntung";
+                    else if(data.status === "TIDAK BERUNTUNG") badgeClass = "s-gagal";
+
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${no++}</td>
+                        <td>${waktu}</td>
+                        <td>
+                            <strong style="color:var(--primary)">${data.pilihanGame}</strong><br>
+                            Nickname: ${data.namaAkun}<br>
+                            ID: ${data.idGame} ${data.idServer ? `(${data.idServer})` : ''}
+                        </td>
+                        <td><a href="https://wa.me/${data.noWa}" target="_blank" style="color:var(--success); text-decoration:none;"><i class="fab fa-whatsapp"></i> ${data.noWa}</a></td>
+                        <td>
+                            <a href="${data.buktiSubscribeUrl}" target="_blank"><img src="${data.buktiSubscribeUrl}" class="img-preview" title="Bukti Subscribe"></a>
+                            <a href="${data.buktiLikeUrl}" target="_blank"><img src="${data.buktiLikeUrl}" class="img-preview" title="Bukti Like"></a>
+                        </td>
+                        <td><span class="status-badge ${badgeClass}">${data.status}</span></td>
+                        <td>
+                            <button class="btn-action btn-win" onclick="ubahStatus('${id}', 'BERUNTUNG')"><i class="fas fa-check"></i> Menang</button>
+                            <button class="btn-action btn-lose" onclick="ubahStatus('${id}', 'TIDAK BERUNTUNG')"><i class="fas fa-times"></i> Kalah</button>
+                        </td>
+                    `;
+                    tableBody.appendChild(tr);
+                });
+            } catch (error) {
+                console.error(error);
+                tableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: red;">Gagal memuat data.</td></tr>';
+            }
+        }
+
+        // Fungsi Update Status
+        window.ubahStatus = async (idDokumen, statusBaru) => {
+            const konfirmasi = confirm(`Yakin ingin mengubah status menjadi ${statusBaru}?`);
+            if(!konfirmasi) return;
+
+            try {
+                const docRef = doc(db, "lootsaku_giveaway", idDokumen);
+                await updateDoc(docRef, { status: statusBaru });
+                alert("Status berhasil diubah!");
+                loadData(); // Refresh tabel
+            } catch (error) {
+                console.error(error);
+                alert("Gagal mengubah status!");
+            }
+        };
+    </script>
+</body>
+</html>
